@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Système de Reconnaissance de Clés</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .panel {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 15px 32px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .button.secondary {
+            background-color: #008CBA;
+        }
+        .button.warning {
+            background-color: #f44336;
+        }
+        .button.info {
+            background-color: #2196F3;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+        .image-container {
+            position: relative;
+            max-width: 100%;
+            margin-top: 20px;
+        }
+        .image-container img {
+            max-width: 100%;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            transition: transform 0.3s ease;
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px;
+            border-radius: 4px;
+            display: flex;
+            gap: 5px;
+        }
+        .zoom-controls button {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+        }
+        .key-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .key-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .key-item:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .metadata {
+            white-space: pre-wrap;
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .webcam-container {
+            margin-top: 20px;
+            text-align: center;
+        }
+        #webcam {
+            max-width: 100%;
+            border-radius: 4px;
+        }
+        .filters {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        .match-result {
+            background: #e8f5e9;
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .no-match {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+    </style>
+</head>
+<body>
+    <h1>Système de Reconnaissance de Clés</h1>
+    
+    <div class="container">
+        <div class="panel">
+            <h2>Ajouter une Nouvelle Clé</h2>
+            <div class="button-group">
+                <input type="file" id="keyInput" accept="image/*" style="display: none">
+                <button class="button" onclick="document.getElementById('keyInput').click()">
+                    Sélectionner une Image
+                </button>
+                <button class="button secondary" onclick="startWebcam()">
+                    Utiliser Webcam
+                </button>
+            </div>
+            
+            <div class="webcam-container" style="display: none;">
+                <video id="webcam" autoplay playsinline></video>
+                <div class="button-group">
+                    <button class="button" onclick="captureImage()">Capturer</button>
+                    <button class="button warning" onclick="stopWebcam()">Arrêter</button>
+                </div>
+            </div>
+
+            <input type="text" id="keyName" placeholder="Nom de la Clé" 
+                   style="margin: 10px 0; padding: 8px; width: 100%; border-radius: 4px; border: 1px solid #ddd;">
+            
+            <div class="filters">
+                <h3>Filtres d'Image</h3>
+                <div class="button-group">
+                    <button class="button info" onclick="applyFilter('grayscale')">Noir et Blanc</button>
+                    <button class="button info" onclick="applyFilter('edge')">Détection de Bords</button>
+                    <button class="button info" onclick="applyFilter('original')">Original</button>
+                </div>
+            </div>
+
+            <button class="button" id="saveKeyButton" disabled>Enregistrer la Clé</button>
+            
+            <div class="image-container">
+                <div id="newKeyPreview"></div>
+                <div class="zoom-controls">
+                    <button onclick="zoomImage('in')">+</button>
+                    <button onclick="zoomImage('out')">-</button>
+                    <button onclick="rotateImage()">↻</button>
+                </div>
+            </div>
+            <div id="newKeyMetadata" class="metadata"></div>
+        </div>
+
+        <div class="panel">
+            <h2>Reconnaître une Clé</h2>
+            <div class="button-group">
+                <input type="file" id="recognizeInput" accept="image/*" style="display: none">
+                <button class="button secondary" onclick="document.getElementById('recognizeInput').click()">
+                    Sélectionner une Clé
+                </button>
+                <button class="button" onclick="startWebcamRecognition()">
+                    Utiliser Webcam
+                </button>
+            </div>
+            
+            <div class="image-container">
+                <div id="recognizePreview"></div>
+                <div class="zoom-controls">
+                    <button onclick="zoomImage('in', 'recognize')">+</button>
+                    <button onclick="zoomImage('out', 'recognize')">-</button>
+                    <button onclick="rotateImage('recognize')">↻</button>
+                </div>
+            </div>
+            <div id="matchResults" class="metadata"></div>
+        </div>
+    </div>
+
+    <div class="panel" style="margin-top: 20px;">
+        <h2>Base de Données des Clés</h2>
+        <div class="button-group">
+            <button class="button" onclick="exportDatabase()">Exporter la Base</button>
+            <button class="button secondary" onclick="document.getElementById('importInput').click()">
+                Importer des Clés
+            </button>
+            <input type="file" id="importInput" accept=".json" style="display: none" 
+                   onchange="importDatabase(this.files[0])">
+        </div>
+        <div id="keyList" class="key-list"></div>
+    </div>
+
+    <script>
+        let currentKey = null;
+        let zoomLevel = 1;
+        let rotation = 0;
+        let stream = null;
+
+        async function loadKeys() {
+            try {
+                const response = await fetch('/api/keys');
+                const keys = await response.json();
+                
+                const keyList = document.getElementById('keyList');
+                keyList.innerHTML = keys.map(key => `
+                    <div class="key-item">
+                        <div>
+                            <strong>${key.name}</strong>
+                            <small>(${new Date(key.created_at).toLocaleDateString('fr-FR')})</small>
+                        </div>
+                        <div class="button-group">
+                            <button class="button info" onclick="viewDetails(${key.id})">
+                                Détails
+                            </button>
+                            <button class="button" onclick="generatePDF(${key.id})">
+                                PDF
+                            </button>
+                            <button class="button warning" onclick="deleteKey(${key.id})">
+                                Supprimer
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Erreur lors du chargement des clés:', error);
+            }
+        }
+
+        async function startWebcam() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                const video = document.getElementById('webcam');
+                video.srcObject = stream;
+                document.querySelector('.webcam-container').style.display = 'block';
+            } catch (error) {
+                alert('Erreur d\'accès à la webcam: ' + error.message);
+            }
+        }
+
+        function stopWebcam() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                document.querySelector('.webcam-container').style.display = 'none';
+            }
+        }
+
+        async function captureImage() {
+            const video = document.getElementById('webcam');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+            const file = new File([blob], 'capture.jpg', { type: 'image/jpeg' });
+            
+            const preview = document.getElementById('newKeyPreview');
+            preview.innerHTML = `<img src="${URL.createObjectURL(file)}" style="max-width: 100%;">`;
+            document.getElementById('saveKeyButton').disabled = false;
+            
+            stopWebcam();
+        }
+
+        function rotateImage(type = 'new') {
+            const container = type === 'new' ? 
+                document.getElementById('newKeyPreview') : 
+                document.getElementById('recognizePreview');
+            
+            const img = container.querySelector('img');
+            if (!img) return;
+
+            rotation = (rotation + 90) % 360;
+            img.style.transform = `scale(${zoomLevel}) rotate(${rotation}deg)`;
+        }
+
+        async function applyFilter(filter) {
+            const preview = document.getElementById('newKeyPreview');
+            const img = preview.querySelector('img');
+            if (!img) return;
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const image = new Image();
+            image.src = img.src;
+            
+            image.onload = () => {
+                canvas.width = image.width;
+                canvas.height = image.height;
+                
+                switch(filter) {
+                    case 'grayscale':
+                        ctx.filter = 'grayscale(100%)';
+                        break;
+                    case 'edge':
+                        ctx.filter = 'contrast(200%) brightness(150%)';
+                        break;
+                    case 'original':
+                        ctx.filter = 'none';
+                        break;
+                }
+                
+                ctx.drawImage(image, 0, 0);
+                img.src = canvas.toDataURL();
+            };
+        }
+
+        async function exportDatabase() {
+            try {
+                const response = await fetch('/api/keys');
+                const keys = await response.json();
+                
+                const blob = new Blob([JSON.stringify(keys, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `keys-export-${new Date().toISOString()}.json`;
+                a.click();
+                
+                URL.revokeObjectURL(url);
+            } catch (error) {
+                alert('Erreur lors de l\'exportation: ' + error.message);
+            }
+        }
+
+        async function importDatabase(file) {
+            if (!file) return;
+            
+            try {
+                const content = await file.text();
+                const keys = JSON.parse(content);
+                
+                for (const key of keys) {
+                    await fetch('/api/keys', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(key)
+                    });
+                }
+                
+                loadKeys();
+                alert('Import réussi!');
+            } catch (error) {
+                alert('Erreur lors de l\'import: ' + error.message);
+            }
+        }
+
+        async function viewDetails(keyId) {
+            try {
+                const response = await fetch(`/api/keys/${keyId}`);
+                const key = await response.json();
+                
+                const metadata = JSON.parse(key.metadata);
+                const details = `
+                    Nom: ${key.name}
+                    Créé le: ${new Date(key.created_at).toLocaleDateString('fr-FR')}
+                    
+                    Métadonnées:
+                    ${Object.entries(metadata).map(([k, v]) => `${k}: ${v}`).join('\n')}
+                `;
+                
+                alert(details);
+            } catch (error) {
+                alert('Erreur lors du chargement des détails: ' + error.message);
+            }
+        }
+
+        // Initialisation
+        loadKeys();
+    </script>
+</body>
+</html>
